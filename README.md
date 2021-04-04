@@ -1,5 +1,4 @@
 # mtlPy
---------
 A Python module for the [mockturtle](https://github.com/lsils/mockturtle) logic synthesis framework.
 
 --------
@@ -31,7 +30,9 @@ For example, `-DPYTHON_INCLUDE_DIR=<path>/include/python3.7m -DPYTHON_LIBRARIES=
 python<version> setup.py build
 python<version> setup.py install
 ```
+
 The install command may require sudo permissions, instead passing the `--user` flag will install it only for the current user.
+
 --------
 # Usage
 
@@ -39,7 +40,8 @@ The install command may require sudo permissions, instead passing the `--user` f
 
 --------
 # Contact.
-Yasasvi V Peruvemba, Indian Institute of Technology Indore
-[Mail ID](ee170002061@iiti.ac.in)
+Yasasvi V Peruvemba, Indian Institute of Technology Indore  
 
-Please let me know if there is any issue or further suggestions.
+[mail](ee170002061@iiti.ac.in)
+
+Please contact me over any issue or further suggestions.
