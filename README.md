@@ -40,8 +40,6 @@ The install command may require sudo permissions, instead passing the `--user` f
 
 --------
 # Contact.
-Yasasvi V Peruvemba, Indian Institute of Technology Indore  
-
-[mail](ee170002061@iiti.ac.in)
+Yasasvi V Peruvemba, Indian Institute of Technology Indore  \[[mail](ee170002061@iiti.ac.in)\]
 
 Please contact me over any issue or further suggestions.
