@@ -10,9 +10,14 @@ It has already been added a submodule within this repository, so simply clone it
 Mockturtle by itself is a header-only library, hence no other modifications are required.
 
 # pybind11
-[pybind11](https://github.com/pybind/pybind11)
+[pybind11](https://github.com/pybind/pybind11) has also been added as a submodule, hence following the instruction above, it will also be installed along with `mockturtle`
 
-Please go to the official [pybind11 document](http://pybind11.readthedocs.org/en/master) for installing it.
+To install the system version, please go to the official [pybind11 document](http://pybind11.readthedocs.org/en/master) for further instructions.
+
+The following command will install pybind11 using pip.
+```
+pip install pybind11
+```
 
 # Makefile Configure
 
@@ -39,7 +44,7 @@ The install command may require sudo permissions, instead passing the `--user` f
 `import mtlPy` like the standard Python library. For more information on its functionalities, use `help(mtlPy)` after importing it.
 
 --------
-# Contact.
+# Contact
 Yasasvi V Peruvemba, Indian Institute of Technology Indore  \[[mail](ee170002061@iiti.ac.in)\]
 
 Please contact me over any issue or further suggestions.
