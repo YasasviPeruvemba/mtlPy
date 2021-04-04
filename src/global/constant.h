@@ -1,0 +1,12 @@
+#ifndef MTL_PY_CONSTANT_H_
+#define MTL_PY_CONSTANT_H_
+
+#include "type.h"
+
+PROJECT_NAMESPACE_BEGIN
+
+PROJECT_NAMESPACE_END
+
+#endif // MTL_PY_CONSTANT_H_
+
+
