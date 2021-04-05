@@ -7,6 +7,9 @@
 #include "global/global.h"
 #include <mockturtle/mockturtle.hpp>
 #include <lorina/aiger.hpp>
+// For balancing operations
+#include <mockturtle/algorithms/balancing.hpp>
+#include <mockturtle/algorithms/balancing/sop_balancing.hpp>
 
 PROJECT_NAMESPACE_BEGIN
 
@@ -114,10 +117,21 @@ class MtlInterface
         /*------------------------------*/ 
         /* Start and stop the framework */
         /*------------------------------*/ 
+        void start();
+        void end();
         /// @brief read a file
         /// @param filename
         /// @return if succesful
         float read(const std::string & filename);
+        /*------------------------------*/ 
+        /* Perform Logic Synthesis      */
+        /*------------------------------*/
+        /// @brief Perform SOP balancing on the MIG
+        /// @return the time taken to perform balancing
+        float balance(bool crit, IntType cut_size); 
+        /// @brief Perform rewriting on the MIG
+        /// @return the time taken to perform rewriting
+        float rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IntType cut_size);
         /*------------------------------*/ 
         /* Query the information        */
         /*------------------------------*/ 
@@ -144,6 +158,7 @@ class MtlInterface
 
     private:
         mockturtle::mig_network _mig;
+        bool _interface = false; // To start and stop the interface
         RealType _lastClk; ///< The time of last operation
         IntType _numMigNodes = -1; ///< Number of MIG nodes
         IntType _depth = -1; ///< The depth of the MIG network
@@ -159,8 +174,23 @@ PROJECT_NAMESPACE_END
 
 PROJECT_NAMESPACE_BEGIN
 
+void MtlInterface::start(){
+    mockturtle::mig_network mig;
+    _mig = mig;
+    _interface = true;
+    return;
+}
+
+void MtlInterface::end(){
+    _interface = false;
+    return;
+}
+
 float MtlInterface::read(const std::string &filename)
 {
+    if(!_interface){
+        return -1.0;
+    }
     auto beginClk = clock();
     char Command[1000];
     // read the file
@@ -170,6 +200,38 @@ float MtlInterface::read(const std::string &filename)
     _lastClk = endClk - beginClk;
     this->updateGraph();
     return (float)_lastClk/CLOCKS_PER_SEC;
+}
+
+float MtlInterface::balance(bool crit, IntType cut_size){
+    if(!_interface){
+        return -1.0;
+    }
+    mockturtle::sop_rebalancing<mockturtle::mig_network> sop_balancing;
+    mockturtle::balancing_params ps;
+    mockturtle::balancing_stats st;
+
+    ps.progress = false;
+    ps.cut_enumeration_ps.cut_size = cut_size;
+    ps.only_on_critical_path = crit;
+
+    _mig = mockturtle::balancing( _mig, {sop_balancing}, ps, &st );
+    return mockturtle::to_seconds( st.time_total );
+}
+
+float MtlInterface::rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IntType cut_size){
+    if(!_interface){
+        return -1.0;
+    }
+    mockturtle::mig_npn_resynthesis resyn;
+    mockturtle::cut_rewriting_params ps;
+    mockturtle::cut_rewriting_stats st;
+    ps.cut_enumeration_ps.cut_size = cut_size;
+    ps.allow_zero_gain = allow_zero_gain;
+    ps.use_dont_cares = use_dont_cares;
+    ps.preserve_depth = preserve_depth;
+    _mig = mockturtle::cut_rewriting( _mig, resyn, ps, &st );
+    _mig = mockturtle::cleanup_dangling( _mig );
+    return mockturtle::to_seconds(st.time_total);
 }
 
 void MtlInterface::updateGraph()
@@ -218,16 +280,19 @@ void initMtlInterfaceAPI(py::module &m)
 {
     py::class_<PROJECT_NAMESPACE::MtlInterface>(m , "MtlInterface")
         .def(py::init<>())
+        .def("start", &PROJECT_NAMESPACE::MtlInterface::start, "Start the interface")
+        .def("end", &PROJECT_NAMESPACE::MtlInterface::end, "Deallocate space for the interface")
         .def("read", &PROJECT_NAMESPACE::MtlInterface::read, "Read a file")
         .def("migStats", &PROJECT_NAMESPACE::MtlInterface::migStats, "Get the AIG stats from the ABC framework`")
         .def("migNode", &PROJECT_NAMESPACE::MtlInterface::migNode, "Get one MigNode")
-        .def("numNodes", &PROJECT_NAMESPACE::MtlInterface::numNodes, "Get the number of nodes");
-        // .def("balance", &PROJECT_NAMESPACE::MtlInterface::balance, "balance action",
-                // py::arg("l") = false, py::arg("d") = false, py::arg("s") = false, py::arg("x") = false)
+        .def("numNodes", &PROJECT_NAMESPACE::MtlInterface::numNodes, "Get the number of nodes")
+        .def("balance", &PROJECT_NAMESPACE::MtlInterface::balance, "balance action",
+                py::arg("crit") = false, py::arg("cut_size") = 4u)
+        .def("rewrite", &PROJECT_NAMESPACE::MtlInterface::rewrite, "rewrite action",
+                py::arg("allow_zero_gain") = false, py::arg("use_dont_cares") = false,
+                py::arg("preserve_depth") = false, py::arg("cut_size") = 4u);
         // .def("resub", &PROJECT_NAMESPACE::MtlInterface::resub, "resub action",
                 // py::arg("k") = -1, py::arg("n") = -1, py::arg("f") = -1,
-                // py::arg("l") = false, py::arg("z") = false)
-        // .def("rewrite", &PROJECT_NAMESPACE::MtlInterface::rewrite, "rewrite action",
                 // py::arg("l") = false, py::arg("z") = false)
         // .def("refactor", &PROJECT_NAMESPACE::MtlInterface::refactor, "refactor action",
                 // py::arg("n") = -1, py::arg("l") = false, py::arg("z") = false)
