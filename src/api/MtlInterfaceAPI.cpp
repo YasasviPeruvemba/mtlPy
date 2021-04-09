@@ -11,6 +11,8 @@
 #include <mockturtle/algorithms/balancing.hpp>
 #include <mockturtle/algorithms/balancing/sop_balancing.hpp>
 
+#include <bits/stdc++.h>
+
 PROJECT_NAMESPACE_BEGIN
 
 /// @class MTL_PY::MigStats
@@ -41,13 +43,16 @@ class MigStats
 
 // object types
 typedef enum { 
-    MIG_NODE_CONST1= 0, //  0:  constant 1 node
-    MIG_NODE_PO,        //  1:  primary output terminal
-    MIG_NODE_PI,        //  2:  primary input terminal
-    MIG_NODE_NONO,      //  3:  fanin 0: no inverter fanin 1: no inv
-    MIG_NODE_INVNO,     //  4:  fanin 0: has inverter fanin 1: no inverter
-    MIG_NODE_INVINV,    //  5:  fanin 0: has inverter fanin 1: has inverter
-    MIG_NODE_NUMBER     //  6:  unused
+    MIG_NODE_CONST1 = 0,      //  0:  constant 1 node
+    MIG_NODE_PI = 1,          //  1:  primary input terminal
+    MIG_NODE_PO = 2,          //  2:  primary output terminal
+    MIG_NODE_NONONO = 3,      //  3:  fanin 0: no inv fanin 1: no inv fanin 2: no inv
+    MIG_NODE_INVNONO = 4,     //  4:  fanin 0: has inv fanin 1: no inv fanin 2: no inv
+    MIG_NODE_INVINVNO = 5,    //  5:  fanin 0: has inv fanin 1: has inv fanin 2: no inv
+    MIG_NODE_INVINVINV = 6,   //  6:  fanin 0: has inv fanin 1: has inv fanin 2: has inv   
+    MIG_NODE_PIO = 7,         //  7:  Both PI and PO
+    MIG_NODE_POC = 8,         //  8:  Both Constant and PO
+    MIG_NODE_NUMBER = 9
 } MigNodeType;
 
 /// @class MTL_PY::MigNode
@@ -90,11 +95,63 @@ class MigNode
         }
         /// @brief Configure the node with Abc_Obj_t
         /// @param Pointer to Abc_Obj_t
-        void configure(mockturtle::mig_network::signal a, mockturtle::mig_network::signal b, mockturtle::mig_network::signal c){
+        void configure(mockturtle::mig_network::signal a, mockturtle::mig_network::signal b, mockturtle::mig_network::signal c, IndexType num_fanouts, int type){
+            _fanout_size = num_fanouts;
+            if(type == 0){ // Normal Node
                 _fanin0 = a.index;
                 _fanin1 = b.index;
                 _fanin2 = c.index;
-                // find way to calculate num_fanouts
+
+                if(!a.complement && !b.complement && !c.complement){
+                    this->setNodeType(MIG_NODE_NONONO);
+                }
+                else if(!a.complement && !b.complement && c.complement){
+                    std::swap(_fanin0, _fanin2);
+                    this->setNodeType(MIG_NODE_INVNONO);
+                }
+                else if(!a.complement && b.complement && !c.complement){
+                    std::swap(_fanin0, _fanin1);
+                    this->setNodeType(MIG_NODE_INVNONO);
+                }
+                else if(!a.complement && b.complement && c.complement){
+                    std::swap(_fanin0, _fanin2);
+                    this->setNodeType(MIG_NODE_INVINVNO);
+                }
+                else if(a.complement && !b.complement && !c.complement){
+                    this->setNodeType(MIG_NODE_INVNONO);
+                }
+                else if(a.complement && !b.complement && c.complement){
+                    std::swap(_fanin1, _fanin2);
+                    this->setNodeType(MIG_NODE_INVINVNO);
+                }
+                else if(a.complement && b.complement && !c.complement){
+                    this->setNodeType(MIG_NODE_INVINVNO);
+                }
+                else if(a.complement && b.complement && c.complement){
+                    this->setNodeType(MIG_NODE_INVINVINV);
+                }
+            }
+            else if(type == 1){ // Constant
+                this->setNodeType(MIG_NODE_CONST1);
+                _fanin0 = a.index;
+                _fanin1 = b.index;
+                _fanin2 = c.index;
+            }
+            else if(type == 2){ // Primary Input
+                this->setNodeType(MIG_NODE_PI);
+            }
+            else if(type == 3){ // Primary Output
+                this->setNodeType(MIG_NODE_PO);
+                _fanin0 = a.index;
+                _fanin1 = b.index;
+                _fanin2 = c.index;
+            }
+            else if(type == 4){ // Primary Input and Output
+                this->setNodeType(MIG_NODE_PIO);
+            }
+            else if(type == 5){ // Primary Input and Output
+                this->setNodeType(MIG_NODE_POC);
+            }
         }
         
         // Find what class represents a node within mockturtle
@@ -104,8 +161,8 @@ class MigNode
         IntType _fanin0 = -1; ///< The fanin 0. -1 if no fanin 0
         IntType _fanin1 = -1; ///< The fanin 1. -1 if no fanin 1
         IntType _fanin2 = -1; ///< The fanin 2. -1 if no fanin 2
-        IntType _fanout_size = -1; ///< Indices to fanout nodes
-        IntType _nodeType = 6; ///< The type of this node
+        IndexType _fanout_size = -1; ///< Total fanout nodes
+        IntType _nodeType = MIG_NODE_NUMBER; ///< The type of this node
 };
 
 /// @class MTL_PY::MtlInterface
@@ -128,10 +185,13 @@ class MtlInterface
         /*------------------------------*/
         /// @brief Perform SOP balancing on the MIG
         /// @return the time taken to perform balancing
-        float balance(bool crit, IntType cut_size); 
+        float balance(bool crit, IndexType cut_size); 
         /// @brief Perform rewriting on the MIG
         /// @return the time taken to perform rewriting
-        float rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IntType cut_size);
+        float rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IndexType min_cut_size);
+        /// @brief Perform resubstitution on the MIG
+        /// @return the time taken to perform resubstitution
+        float resub(IndexType max_pis, IndexType max_inserts, bool use_dont_cares, IndexType window_size, bool preserve_depth);
         /*------------------------------*/ 
         /* Query the information        */
         /*------------------------------*/ 
@@ -202,7 +262,7 @@ float MtlInterface::read(const std::string &filename)
     return (float)_lastClk/CLOCKS_PER_SEC;
 }
 
-float MtlInterface::balance(bool crit, IntType cut_size){
+float MtlInterface::balance(bool crit, IndexType cut_size){
     if(!_interface){
         return -1.0;
     }
@@ -218,14 +278,15 @@ float MtlInterface::balance(bool crit, IntType cut_size){
     return mockturtle::to_seconds( st.time_total );
 }
 
-float MtlInterface::rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IntType cut_size){
+float MtlInterface::rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IndexType min_cut_size){
     if(!_interface){
         return -1.0;
     }
     mockturtle::mig_npn_resynthesis resyn;
     mockturtle::cut_rewriting_params ps;
     mockturtle::cut_rewriting_stats st;
-    ps.cut_enumeration_ps.cut_size = cut_size;
+    ps.cut_enumeration_ps.cut_size = 4u;
+    ps.min_cand_cut_size = min_cut_size;
     ps.allow_zero_gain = allow_zero_gain;
     ps.use_dont_cares = use_dont_cares;
     ps.preserve_depth = preserve_depth;
@@ -234,31 +295,87 @@ float MtlInterface::rewrite(bool allow_zero_gain, bool use_dont_cares, bool pres
     return mockturtle::to_seconds(st.time_total);
 }
 
+float MtlInterface::resub(IndexType max_pis, IndexType max_inserts, bool use_dont_cares, IndexType window_size, bool preserve_depth){
+    if(!_interface){
+        return -1.0;
+    }
+    mockturtle::resubstitution_params ps;
+    mockturtle::resubstitution_stats st;
+    ps.max_pis = max_pis;
+    ps.max_inserts = max_inserts;
+    ps.use_dont_cares = use_dont_cares;
+    ps.window_size = window_size;
+    ps.preserve_depth = preserve_depth;
+    mockturtle::depth_view _depth_mig{ _mig }; 
+    mockturtle::fanout_view _fanout_mig{ _depth_mig };
+
+    mockturtle::mig_resubstitution( _fanout_mig, ps, &st );
+    _mig = cleanup_dangling( _mig );
+    return mockturtle::to_seconds(st.time_total);
+}
+
 void MtlInterface::updateGraph()
 {
-    _numMigNodes = _mig.size() - _mig.num_pis();
+    _numMigNodes = _mig.size();
     mockturtle::depth_view mig_depth{ _mig };
     _depth = mig_depth.depth();
     _numPO = _mig.num_pos();
     _numPI = _mig.num_pis();
     _numConst = 0;
-    IntType idx = 0;
-    IntType num_pis = _mig.num_pis();
     _migNodes.resize(_numMigNodes);
-    //DBG("update graph: num of nodes %d \n", this->numNodes());
-    _mig.foreach_node( [&]( auto node ){
-        if(idx > 0 && idx <= num_pis){}
-        else{
-                mockturtle::mig_network::signal ch0 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[0]);
-                mockturtle::mig_network::signal ch1 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[1]);
-                mockturtle::mig_network::signal ch2 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[2]); 
-                // std::cout << ch0.index << "\t" << ch0.complement << "\t";
-                // std::cout << ch1.index << "\t" << ch1.complement << "\t";
-                // std::cout << ch2.index << "\t" << ch2.complement << "\n";
-                _migNodes[idx-num_pis-1].configure(ch0, ch1, ch2);
+
+    std::vector <IntType> visited(_numMigNodes, 0);
+
+    //Configure Primary Outputs
+    _mig.foreach_po( [&](auto node){
+        IndexType num_fanout = _mig.fanout_size(node.index);
+        mockturtle::mig_network::signal ch0 = mockturtle::mig_network::signal(_mig._storage->nodes[node.index].children[0]);
+        mockturtle::mig_network::signal ch1 = mockturtle::mig_network::signal(_mig._storage->nodes[node.index].children[1]);
+        mockturtle::mig_network::signal ch2 = mockturtle::mig_network::signal(_mig._storage->nodes[node.index].children[2]); 
+        if(node.index==0){
+            // Configure as both Output and Constant
+            _migNodes[node.index].configure(ch0, ch1, ch2, num_fanout, 5);    
         }
-        idx++;
-    } );
+        else{
+            _migNodes[node.index].configure(ch0, ch1, ch2, num_fanout, 3);
+        }
+        visited[node.index] = 1;
+    });
+
+    // Configure Primary Inputs
+    _mig.foreach_pi( [&](auto node){
+        IndexType num_fanout = _mig.fanout_size(node);
+        mockturtle::mig_network::signal ch0, ch1, ch2;
+        if(visited[node] != 0){
+            // Configure as both Primary Input and Output
+            visited[node] = 3;
+            _migNodes[node].configure(ch0, ch1, ch2, num_fanout, 4);
+        }
+        else{
+            visited[node] = 2;
+            _migNodes[node].configure(ch0, ch1, ch2, num_fanout, 2);
+        } 
+    });
+
+    _mig.foreach_node( [&]( auto node ){
+        IndexType num_fanout = _mig.fanout_size(node);
+        mockturtle::mig_network::signal ch0 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[0]);
+        mockturtle::mig_network::signal ch1 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[1]);
+        mockturtle::mig_network::signal ch2 = mockturtle::mig_network::signal(_mig._storage->nodes[_mig.node_to_index(node)].children[2]); 
+        if(_mig.node_to_index(node) == 0 && !visited[0]){
+            //configure as constant
+            _migNodes[_mig.node_to_index(node)].configure(ch0, ch1, ch2, num_fanout, 1);             
+        }
+        else if(visited[_mig.node_to_index(node)] != 0 || _mig.node_to_index(node) == 0){
+            // Already configured
+        }
+        else{
+            // Configure as internal node
+            _migNodes[_mig.node_to_index(node)].configure(ch0, ch1, ch2, num_fanout, 0);
+            visited[_mig.node_to_index(node)] = 4;
+        }
+    });
+
 }
 
 MigStats MtlInterface::migStats()
@@ -290,10 +407,10 @@ void initMtlInterfaceAPI(py::module &m)
                 py::arg("crit") = false, py::arg("cut_size") = 4u)
         .def("rewrite", &PROJECT_NAMESPACE::MtlInterface::rewrite, "rewrite action",
                 py::arg("allow_zero_gain") = false, py::arg("use_dont_cares") = false,
-                py::arg("preserve_depth") = false, py::arg("cut_size") = 4u);
-        // .def("resub", &PROJECT_NAMESPACE::MtlInterface::resub, "resub action",
-                // py::arg("k") = -1, py::arg("n") = -1, py::arg("f") = -1,
-                // py::arg("l") = false, py::arg("z") = false)
+                py::arg("preserve_depth") = false, py::arg("min_cut_size") = 3u)
+        .def("resub", &PROJECT_NAMESPACE::MtlInterface::resub, "resub action",
+                py::arg("max_pis") = 8u, py::arg("max_inserts") = 2u, py::arg("use_dont_cares") = false,
+                py::arg("window_size") = 12u, py::arg("preserve_depth") = false);
         // .def("refactor", &PROJECT_NAMESPACE::MtlInterface::refactor, "refactor action",
                 // py::arg("n") = -1, py::arg("l") = false, py::arg("z") = false)
         // .def("compress2rs", &PROJECT_NAMESPACE::MtlInterface::compress2rs)
@@ -318,6 +435,6 @@ void initMtlInterfaceAPI(py::module &m)
         .def("fanin1", &PROJECT_NAMESPACE::MigNode::fanin1, "The node index of fanin 1")
         .def("hasFanin2", &PROJECT_NAMESPACE::MigNode::hasFanin2, "Whether the node has fanin2")
         .def("fanin2", &PROJECT_NAMESPACE::MigNode::fanin2, "The node index of fanin 2")
-        .def("nodeType", &PROJECT_NAMESPACE::MigNode::nodeType, "The node type. 0: const 1, 1: PO, 2: PI, 3: a and b, 4: not a and b, 5: not a and not b, 6 unknown")
-        .def("numFanouts", &PROJECT_NAMESPACE::MigNode::numFanouts, "The number of fanouts");
+        .def("numFanouts", &PROJECT_NAMESPACE::MigNode::numFanouts, "The number of fanouts")
+        .def("nodeType", &PROJECT_NAMESPACE::MigNode::nodeType, "The node type. 0: const 1, 1: PI, 2: PO, 3: abc, 4: ~abc, 5: ~a~bc, 6 ~a~b~c, 7 unknown");
 }
