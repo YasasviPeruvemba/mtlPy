@@ -189,6 +189,9 @@ class MtlInterface
         /// @brief Perform rewriting on the MIG
         /// @return the time taken to perform rewriting
         float rewrite(bool allow_zero_gain, bool use_dont_cares, bool preserve_depth, IndexType min_cut_size);
+        /// @brief Perform refactoring on the MIG
+        /// @return the time taken to perform refactoring
+        float refactor(bool allow_zero_gain, bool use_dont_cares);
         /// @brief Perform resubstitution on the MIG
         /// @return the time taken to perform resubstitution
         float resub(IndexType max_pis, IndexType max_inserts, bool use_dont_cares, IndexType window_size, bool preserve_depth);
@@ -270,7 +273,6 @@ float MtlInterface::balance(bool crit, IndexType cut_size){
     mockturtle::balancing_params ps;
     mockturtle::balancing_stats st;
 
-    ps.progress = false;
     ps.cut_enumeration_ps.cut_size = cut_size;
     ps.only_on_critical_path = crit;
 
@@ -295,6 +297,20 @@ float MtlInterface::rewrite(bool allow_zero_gain, bool use_dont_cares, bool pres
     return mockturtle::to_seconds(st.time_total);
 }
 
+float MtlInterface::refactor(bool allow_zero_gain, bool use_dont_cares){
+    if(!_interface){
+        return -1.0;
+    }
+    mockturtle::akers_resynthesis<mockturtle::mig_network> resyn;
+    mockturtle::refactoring_params ps;
+    mockturtle::refactoring_stats st;
+    ps.allow_zero_gain = allow_zero_gain;
+    ps.use_dont_cares = use_dont_cares;
+    mockturtle::refactoring( _mig, resyn, ps, &st);
+    _mig = mockturtle::cleanup_dangling( _mig );
+    return mockturtle::to_seconds(st.time_total);
+}
+
 float MtlInterface::resub(IndexType max_pis, IndexType max_inserts, bool use_dont_cares, IndexType window_size, bool preserve_depth){
     if(!_interface){
         return -1.0;
@@ -310,7 +326,7 @@ float MtlInterface::resub(IndexType max_pis, IndexType max_inserts, bool use_don
     mockturtle::fanout_view _fanout_mig{ _depth_mig };
 
     mockturtle::mig_resubstitution( _fanout_mig, ps, &st );
-    _mig = cleanup_dangling( _mig );
+    _mig = mockturtle::cleanup_dangling( _mig );
     return mockturtle::to_seconds(st.time_total);
 }
 
@@ -410,14 +426,9 @@ void initMtlInterfaceAPI(py::module &m)
                 py::arg("preserve_depth") = false, py::arg("min_cut_size") = 3u)
         .def("resub", &PROJECT_NAMESPACE::MtlInterface::resub, "resub action",
                 py::arg("max_pis") = 8u, py::arg("max_inserts") = 2u, py::arg("use_dont_cares") = false,
-                py::arg("window_size") = 12u, py::arg("preserve_depth") = false);
-        // .def("refactor", &PROJECT_NAMESPACE::MtlInterface::refactor, "refactor action",
-                // py::arg("n") = -1, py::arg("l") = false, py::arg("z") = false)
-        // .def("compress2rs", &PROJECT_NAMESPACE::MtlInterface::compress2rs)
-        // .def("compress2rs_balance", &PROJECT_NAMESPACE::MtlInterface::compress2rs_balance)
-        // .def("resyn2rs", &PROJECT_NAMESPACE::MtlInterface::resyn2rs)
-        // .def("dch", &PROJECT_NAMESPACE::MtlInterface::dch)
-        // .def("dc2", &PROJECT_NAMESPACE::MtlInterface::dc2)
+                py::arg("window_size") = 12u, py::arg("preserve_depth") = false)
+        .def("refactor", &PROJECT_NAMESPACE::MtlInterface::refactor, "refactor action",
+                py::arg("allow_zero_gain") = false, py::arg("use_dont_cares") = false);
 
     py::class_<PROJECT_NAMESPACE::MigStats>(m , "MigStats")
         .def(py::init<>())
@@ -436,5 +447,5 @@ void initMtlInterfaceAPI(py::module &m)
         .def("hasFanin2", &PROJECT_NAMESPACE::MigNode::hasFanin2, "Whether the node has fanin2")
         .def("fanin2", &PROJECT_NAMESPACE::MigNode::fanin2, "The node index of fanin 2")
         .def("numFanouts", &PROJECT_NAMESPACE::MigNode::numFanouts, "The number of fanouts")
-        .def("nodeType", &PROJECT_NAMESPACE::MigNode::nodeType, "The node type. 0: const 1, 1: PI, 2: PO, 3: abc, 4: ~abc, 5: ~a~bc, 6 ~a~b~c, 7 unknown");
+        .def("nodeType", &PROJECT_NAMESPACE::MigNode::nodeType, "The node type. 0: constant, 1: PI, 2: PO, 3: abc, 4: ~abc, 5: ~a~bc, 6 ~a~b~c, 7 PI & PO, 8 PO and constant, 9 unknown");
 }
