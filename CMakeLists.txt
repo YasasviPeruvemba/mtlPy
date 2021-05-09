@@ -72,7 +72,6 @@ mark_as_advanced(VERSION_MAJOR VERSION_MINOR VERSION_PATCH)
 
 file(GLOB SOURCES src/global/*.h    src/global/*.cpp
                   src/util/*.h      src/util/*.cpp
-                  src/util/thirdparty/*.h      src/util/thirdparty/*.cpp
                   )
 
 file(GLOB EXE_SOURCES src/main/main.cpp)
