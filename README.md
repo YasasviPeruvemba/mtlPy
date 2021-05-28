@@ -41,10 +41,15 @@ The install command may require sudo permissions, instead passing the `--user` f
 --------
 # Usage
 
-`import mtlPy` like the standard Python library. For more information on its functionalities, use `help(mtlPy)` after importing it.
+`import mtlPy` like the standard Python library. For more information on its functionalities, use `help(mtlPy)` after importing it. In case the import statement indicates the absence of the module, make sure to include the .egg file generated in the install process in the system path. This can be done within Python by -
+```
+import sys
+sys.path.append(<path_to_egg>)
+import mtlPy
+```
 
 --------
 # Contact
-Yasasvi V Peruvemba, Indian Institute of Technology Indore  \[[mail](ee170002061@iiti.ac.in)\]
+Yasasvi V Peruvemba, Indian Institute of Technology Indore  \[[mail](yasasvi.peruvemba@gmail.com)\]
 
 Please contact me over any issue or further suggestions.
