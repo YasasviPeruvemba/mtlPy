@@ -176,10 +176,18 @@ class MtlInterface
         /*------------------------------*/ 
         void start();
         void end();
-        /// @brief read a file
+        /// @brief read an AIG file
         /// @param filename
-        /// @return if succesful
-        float read(const std::string & filename);
+        /// @return Time taken to perform the read
+        float read_aig(const std::string & filename);
+        /// @brief read a Verilog file
+        /// @param filename
+        /// @return Time taken to perform the read
+        float read_verilog(const std::string & filename);
+        /// @brief Write a Verilog file
+        /// @param filename
+        /// @return Time taken to perform the write
+        float write_verilog(const std::string & filename);
         /*------------------------------*/ 
         /* Perform Logic Synthesis      */
         /*------------------------------*/
@@ -249,7 +257,7 @@ void MtlInterface::end(){
     return;
 }
 
-float MtlInterface::read(const std::string &filename)
+float MtlInterface::read_aig(const std::string &filename)
 {
     if(!_interface){
         return -1.0;
@@ -262,6 +270,37 @@ float MtlInterface::read(const std::string &filename)
     auto endClk = clock();
     _lastClk = endClk - beginClk;
     this->updateGraph();
+    return (float)_lastClk/CLOCKS_PER_SEC;
+}
+
+float MtlInterface::read_verilog(const std::string &filename)
+{
+    if(!_interface){
+        return -1.0;
+    }
+    auto beginClk = clock();
+    char Command[1000];
+    // read the file
+    sprintf( Command, "%s", filename.c_str() );
+    lorina::read_verilog(Command, mockturtle::verilog_reader( _mig ) );
+    auto endClk = clock();
+    _lastClk = endClk - beginClk;
+    this->updateGraph();
+    return (float)_lastClk/CLOCKS_PER_SEC;
+}
+
+float MtlInterface::write_verilog(const std::string &filename)
+{
+    if(!_interface){
+        return -1.0;
+    }
+    auto beginClk = clock();
+    char Command[1000];
+    // write the file
+    sprintf( Command, "%s", filename.c_str() );
+    mockturtle::write_verilog( _mig, Command );
+    auto endClk = clock();
+    _lastClk = endClk - beginClk;
     return (float)_lastClk/CLOCKS_PER_SEC;
 }
 
@@ -418,7 +457,9 @@ void initMtlInterfaceAPI(py::module &m)
         .def(py::init<>())
         .def("start", &PROJECT_NAMESPACE::MtlInterface::start, "Start the interface")
         .def("end", &PROJECT_NAMESPACE::MtlInterface::end, "Deallocate space for the interface")
-        .def("read", &PROJECT_NAMESPACE::MtlInterface::read, "Read a file")
+        .def("read_aig", &PROJECT_NAMESPACE::MtlInterface::read_aig, "Read an AIG file")
+        .def("read_verilog", &PROJECT_NAMESPACE::MtlInterface::read_verilog, "Read a verilog file")
+        .def("write_verilog", &PROJECT_NAMESPACE::MtlInterface::write_verilog, "Write a verilog file")
         .def("migStats", &PROJECT_NAMESPACE::MtlInterface::migStats, "Get the MIG stats from the Mockturtle framework")
         .def("migNode", &PROJECT_NAMESPACE::MtlInterface::migNode, "Get one MigNode")
         .def("numNodes", &PROJECT_NAMESPACE::MtlInterface::numNodes, "Get the number of nodes")
